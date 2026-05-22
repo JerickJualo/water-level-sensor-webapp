@@ -11,30 +11,78 @@
     <section class="summary">
       <p class="eyebrow">Water Level Sensor Web App</p>
       <h1>Water Tank Dashboard</h1>
-      <p class="summary-text">Live-ready dashboard using mock data until the ESP32 sensor is connected.</p>
+      <p class="summary-text">Mock sensor data is filtered using a two-scan method to reduce unstable wave readings.</p>
     </section>
 
-    <section class="panel" aria-label="Current water level">
-      <div class="panel-header">
+    <section class="panel scan-panel" aria-label="Two-scan filtering process">
+      <div class="scan-header">
         <div>
-          <p class="label">Current Level</p>
-          <p id="level" class="level-value">--%</p>
+          <p class="label">Filtering Method</p>
+          <h2>Two-Scan Stability Check</h2>
         </div>
-        <span id="status" class="status status-loading">Loading</span>
+        <span id="scan-phase" class="phase-pill">Starting</span>
       </div>
 
-      <div class="meter" aria-hidden="true">
-        <div id="fill" class="meter-fill"></div>
-      </div>
-
-      <div class="details">
+      <div class="previous-result">
         <div>
-          <p class="label">Distance</p>
-          <p id="distance">-- cm</p>
+          <p class="label">Previous Final Accepted Value</p>
+          <p id="previous-level">No previous result yet</p>
         </div>
         <div>
-          <p class="label">Last Updated</p>
-          <p id="updated">Waiting for data</p>
+          <p class="label">Previous Final Update</p>
+          <p id="previous-updated">Waiting for next completed scan</p>
+        </div>
+      </div>
+
+      <div class="scan-grid">
+        <div>
+          <p class="label">Current Sensor Reading</p>
+          <p id="current-reading">--%</p>
+        </div>
+        <div>
+          <p class="label">Baseline Samples</p>
+          <p id="baseline-count">0 / 15</p>
+        </div>
+        <div>
+          <p class="label">Baseline Median</p>
+          <p id="baseline-median">Waiting</p>
+        </div>
+        <div>
+          <p class="label">Accepted Range</p>
+          <p id="accepted-range">Waiting</p>
+        </div>
+        <div>
+          <p class="label">Accepted Samples</p>
+          <p id="accepted-count">0 / 15</p>
+        </div>
+        <div>
+          <p class="label">Rejected Wave Readings</p>
+          <p id="rejected-count">0</p>
+        </div>
+      </div>
+
+      <div class="result-panel" aria-label="Final accepted water level">
+        <div class="panel-header">
+          <div>
+            <p class="label">Current Level</p>
+            <p id="level" class="level-value">--%</p>
+          </div>
+          <span id="status" class="status status-loading">Waiting</span>
+        </div>
+
+        <div class="meter" aria-hidden="true">
+          <div id="fill" class="meter-fill"></div>
+        </div>
+
+        <div class="details">
+          <div>
+            <p class="label">Distance</p>
+            <p id="distance">Waiting for stable result</p>
+          </div>
+          <div>
+            <p class="label">Last Final Update</p>
+            <p id="updated">Waiting for two-scan filtering</p>
+          </div>
         </div>
       </div>
     </section>
