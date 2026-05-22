@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Water Level Monitor</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="dashboard">
+    <section class="summary">
+      <p class="eyebrow">Water Level Sensor Web App</p>
+      <h1>Water Tank Dashboard</h1>
+      <p class="summary-text">Live-ready dashboard using mock data until the ESP32 sensor is connected.</p>
+    </section>
+
+    <section class="panel" aria-label="Current water level">
+      <div class="panel-header">
+        <div>
+          <p class="label">Current Level</p>
+          <p id="level" class="level-value">--%</p>
+        </div>
+        <span id="status" class="status status-loading">Loading</span>
+      </div>
+
+      <div class="meter" aria-hidden="true">
+        <div id="fill" class="meter-fill"></div>
+      </div>
+
+      <div class="details">
+        <div>
+          <p class="label">Distance</p>
+          <p id="distance">-- cm</p>
+        </div>
+        <div>
+          <p class="label">Last Updated</p>
+          <p id="updated">Waiting for data</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
