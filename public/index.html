@@ -3,88 +3,238 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Water Level Monitor</title>
+  <title>Sea Water Level Dashboard</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <main class="dashboard">
-    <section class="summary">
-      <p class="eyebrow">Water Level Sensor Web App</p>
-      <h1>Water Tank Dashboard</h1>
-      <p class="summary-text">Mock sensor data is filtered using a two-scan method to reduce unstable wave readings.</p>
-    </section>
-
-    <section class="panel scan-panel" aria-label="Two-scan filtering process">
-      <div class="scan-header">
-        <div>
-          <p class="label">Filtering Method</p>
-          <h2>Two-Scan Stability Check</h2>
-        </div>
-        <span id="scan-phase" class="phase-pill">Starting</span>
-      </div>
-
-      <div class="previous-result">
-        <div>
-          <p class="label">Previous Final Accepted Value</p>
-          <p id="previous-level">No previous result yet</p>
-        </div>
-        <div>
-          <p class="label">Previous Final Update</p>
-          <p id="previous-updated">Waiting for next completed scan</p>
-        </div>
-      </div>
-
-      <div class="scan-grid">
-        <div>
-          <p class="label">Current Sensor Reading</p>
-          <p id="current-reading">--%</p>
-        </div>
-        <div>
-          <p class="label">Baseline Samples</p>
-          <p id="baseline-count">0 / 15</p>
-        </div>
-        <div>
-          <p class="label">Baseline Median</p>
-          <p id="baseline-median">Waiting</p>
-        </div>
-        <div>
-          <p class="label">Accepted Range</p>
-          <p id="accepted-range">Waiting</p>
-        </div>
-        <div>
-          <p class="label">Accepted Samples</p>
-          <p id="accepted-count">0 / 15</p>
-        </div>
-        <div>
-          <p class="label">Rejected Wave Readings</p>
-          <p id="rejected-count">0</p>
-        </div>
-      </div>
-
-      <div class="result-panel" aria-label="Final accepted water level">
-        <div class="panel-header">
-          <div>
-            <p class="label">Current Level</p>
-            <p id="level" class="level-value">--%</p>
-          </div>
-          <span id="status" class="status status-loading">Waiting</span>
-        </div>
-
-        <div class="meter" aria-hidden="true">
-          <div id="fill" class="meter-fill"></div>
-        </div>
-
-        <div class="details">
-          <div>
-            <p class="label">Distance</p>
-            <p id="distance">Waiting for stable result</p>
+  <main class="app-shell">
+    <section class="dashboard-card" aria-label="Sea water level monitoring dashboard">
+      <header class="dashboard-header">
+        <div class="brand">
+          <div class="wave-icon" aria-hidden="true">
+            <span></span>
           </div>
           <div>
-            <p class="label">Last Final Update</p>
-            <p id="updated">Waiting for two-scan filtering</p>
+            <h1>Sea Water Level</h1>
+            <p id="last-reading">Last reading: waiting for sensor data</p>
           </div>
         </div>
-      </div>
+        <div class="header-actions">
+          <nav class="page-tabs" aria-label="Main pages">
+            <button id="dashboard-tab" class="page-tab active" type="button">Dashboard</button>
+            <button id="history-tab" class="page-tab" type="button">History</button>
+          </nav>
+          <button class="icon-button" type="button" aria-label="Settings">&#9881;</button>
+        </div>
+      </header>
+
+      <section id="dashboard-view" class="page-view active">
+        <section class="demo-controls" aria-label="Demo data controls">
+          <div>
+            <p class="section-label">Demo Data</p>
+            <strong id="scenario-name">ESP32-ready API data</strong>
+          </div>
+          <label for="scenario-select">
+            <span>Condition</span>
+            <select id="scenario-select">
+              <option value="api">API mock scan</option>
+              <option value="stable">Stable weather</option>
+              <option value="raining">Raining</option>
+              <option value="storming">Storming</option>
+              <option value="rising">Rising tide</option>
+              <option value="flooding">Flooding risk</option>
+            </select>
+          </label>
+        </section>
+
+        <section class="level-overview" aria-label="Current sea water level">
+          <div class="gauge-area">
+            <div class="gauge-labels" aria-hidden="true">
+              <span>100%</span>
+              <span>90%</span>
+              <span>80%</span>
+              <span>50%</span>
+              <span>0%</span>
+            </div>
+
+            <div class="gauge-wrap">
+              <div class="zone-label zone-flood">Flooding Level</div>
+              <div class="zone-label zone-very-high">Very High Sea Level</div>
+              <div class="zone-label zone-high">High Sea Level</div>
+              <div class="zone-label zone-low">Low Sea Level</div>
+              <div class="water-gauge">
+                <div id="gauge-fill" class="gauge-fill">
+                  <span id="gauge-percent">--%</span>
+                </div>
+                <div class="threshold threshold-flood"></div>
+                <div class="threshold threshold-high"></div>
+                <div class="threshold threshold-mid"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="reading-panel">
+            <p class="section-label">Current Level</p>
+            <p id="level" class="level-number">--%</p>
+            <p id="status" class="status-text">Waiting for sea level data</p>
+
+            <div class="reading-details">
+              <div>
+                <span>Distance</span>
+                <strong id="distance">-- cm</strong>
+              </div>
+              <div>
+                <span>Scan Phase</span>
+                <strong id="scan-phase">Starting</strong>
+              </div>
+              <div>
+                <span>Previous Final</span>
+                <strong id="previous-level">No previous result</strong>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="chart-section" aria-label="Sea water level history">
+          <div class="chart-header">
+            <div>
+              <p class="section-label">History</p>
+              <h2>Live Water Level Trend</h2>
+            </div>
+            <span id="chart-summary">Mock readings</span>
+          </div>
+
+          <div class="chart-wrap">
+            <canvas id="history-chart" width="900" height="320"></canvas>
+            <div class="chart-zones" aria-hidden="true">
+              <span class="flood-line">Flooding 90%</span>
+              <span class="very-high-line">Very High 80%</span>
+              <span class="high-line">High 50%</span>
+              <span class="low-line">Low 0-49%</span>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section id="history-view" class="page-view history-page" aria-label="Daily sea water level history">
+        <section class="history-filter">
+          <div>
+            <p class="section-label">History</p>
+            <h2>Daily Sea Level Records</h2>
+          </div>
+          <div class="filter-controls">
+            <label for="history-range">
+              <span>Date Filter</span>
+              <select id="history-range">
+                <option value="7">Last 7 days</option>
+                <option value="14">Last 14 days</option>
+                <option value="30">Last 30 days</option>
+                <option value="31">Last 31 days</option>
+              </select>
+            </label>
+            <label for="history-date">
+              <span>Selected Day</span>
+              <select id="history-date"></select>
+            </label>
+          </div>
+        </section>
+
+        <section class="history-cards" aria-label="Selected day summary">
+          <div>
+            <span>Average Level</span>
+            <strong id="day-average">--%</strong>
+          </div>
+          <div>
+            <span>Highest Level</span>
+            <strong id="day-highest">--%</strong>
+          </div>
+          <div>
+            <span>Lowest Level</span>
+            <strong id="day-lowest">--%</strong>
+          </div>
+          <div>
+            <span>Daily Risk</span>
+            <strong id="day-risk">Waiting</strong>
+          </div>
+        </section>
+
+        <section class="history-layout">
+          <div class="history-panel">
+            <div class="chart-header">
+              <div>
+                <p class="section-label">Daily Trend</p>
+                <h2>4 Time Block Averages</h2>
+              </div>
+              <span id="selected-day-label">Selected day</span>
+            </div>
+            <canvas id="daily-trend-chart" width="760" height="300"></canvas>
+          </div>
+
+          <div class="history-panel warning-panel">
+            <p class="section-label">Warning Count</p>
+            <h2>Status Occurrence</h2>
+            <div id="warning-counts" class="warning-counts"></div>
+          </div>
+        </section>
+
+        <section class="history-panel">
+          <div class="chart-header">
+            <div>
+              <p class="section-label">Daily Summary Table</p>
+              <h2>Average Water Level by Time Period</h2>
+            </div>
+            <span id="history-table-count">Maximum 31 days</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>12AM-6AM</th>
+                  <th>6AM-12PM</th>
+                  <th>12PM-6PM</th>
+                  <th>6PM-12AM</th>
+                  <th>Highest</th>
+                  <th>Lowest</th>
+                  <th>Reached Levels</th>
+                  <th>Daily Risk</th>
+                </tr>
+              </thead>
+              <tbody id="daily-summary-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="history-panel monthly-panel">
+          <div class="chart-header">
+            <div>
+              <p class="section-label">Monthly Sea Levels</p>
+              <h2>Monthly Average and Peak Summary</h2>
+            </div>
+            <span id="monthly-summary-count">0 months</span>
+          </div>
+
+          <div class="monthly-layout">
+            <canvas id="monthly-chart" width="760" height="300"></canvas>
+            <div class="table-wrap">
+              <table class="monthly-table">
+                <thead>
+                  <tr>
+                    <th>Month</th>
+                    <th>Average</th>
+                    <th>Highest</th>
+                    <th>Lowest</th>
+                    <th>Flooding Days</th>
+                    <th>Very High Days</th>
+                    <th>Monthly Risk</th>
+                  </tr>
+                </thead>
+                <tbody id="monthly-summary-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </section>
     </section>
   </main>
 

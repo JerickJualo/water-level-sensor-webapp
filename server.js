@@ -10,15 +10,19 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
 function getWaterStatus(percentage) {
-  if (percentage < 30) {
-    return "Low";
+  if (percentage >= 90) {
+    return "Flooding Level";
   }
 
-  if (percentage > 80) {
-    return "High";
+  if (percentage >= 80) {
+    return "Very High Sea Level";
   }
 
-  return "Normal";
+  if (percentage >= 50) {
+    return "High Sea Level";
+  }
+
+  return "Low Sea Level";
 }
 
 function calculateMedian(values) {
