@@ -49,6 +49,15 @@ function calculateDistanceCm(percentage) {
   return Math.round(emptyDistanceCm - (percentage / 100) * distanceRange);
 }
 
+function calculateAllowedRange(baseline) {
+  const toleranceAmount = baseline * (tolerancePercent / 100);
+
+  return {
+    min: Math.max(0, Math.round(baseline - toleranceAmount)),
+    max: Math.min(100, Math.round(baseline + toleranceAmount))
+  };
+}
+
 function createMockSensorReading() {
   const stableWaterLevel = 58;
   const normalMovement = Math.round(Math.random() * 8) - 4;
@@ -66,17 +75,22 @@ const readingsPerScan = 15;
 const scanIntervalMs = 2000;
 const tolerancePercent = 10;
 const stableDisplaySteps = 5;
+const esp32TimeoutMs = 30000;
 
 let baselineReadings = [];
 let filteredReadings = [];
+let filteredDistances = [];
 let rejectedReadings = [];
 let baselineMedian = null;
 let scanPhase = "baseline";
 let completeStepsRemaining = 0;
 let finalAcceptedPercentage = null;
+let finalAcceptedDistanceCm = null;
 let finalAcceptedUpdatedAt = null;
 let previousFinalAcceptedPercentage = null;
 let previousFinalAcceptedUpdatedAt = null;
+let dataSource = "mock";
+let lastEsp32ReadingAt = null;
 
 let waterData = {
   percentage: null,
@@ -87,6 +101,8 @@ let waterData = {
   previousUpdatedAt: null,
   scanPhase,
   currentReading: null,
+  currentDistanceCm: null,
+  dataSource,
   baselineMedian,
   allowedMin: null,
   allowedMax: null,
@@ -96,16 +112,22 @@ let waterData = {
   readingsNeeded: readingsPerScan
 };
 
-function updateWaterData(currentReading) {
-  const allowedMin =
-    baselineMedian === null ? null : Math.max(0, baselineMedian - tolerancePercent);
-  const allowedMax =
-    baselineMedian === null ? null : Math.min(100, baselineMedian + tolerancePercent);
+function getCleanDistanceCm(distanceCm) {
+  const cleanDistance = Number(distanceCm);
+
+  if (Number.isNaN(cleanDistance) || cleanDistance < 0) {
+    return null;
+  }
+
+  return cleanDistance;
+}
+
+function updateWaterData(currentReading, currentDistanceCm) {
+  const allowedRange = baselineMedian === null ? null : calculateAllowedRange(baselineMedian);
 
   waterData = {
     percentage: finalAcceptedPercentage,
-    distanceCm:
-      finalAcceptedPercentage === null ? null : calculateDistanceCm(finalAcceptedPercentage),
+    distanceCm: finalAcceptedDistanceCm,
     status: finalAcceptedPercentage === null
       ? "Waiting"
       : scanPhase === "complete"
@@ -116,9 +138,11 @@ function updateWaterData(currentReading) {
     previousUpdatedAt: previousFinalAcceptedUpdatedAt,
     scanPhase,
     currentReading,
+    currentDistanceCm,
+    dataSource,
     baselineMedian,
-    allowedMin,
-    allowedMax,
+    allowedMin: allowedRange === null ? null : allowedRange.min,
+    allowedMax: allowedRange === null ? null : allowedRange.max,
     baselineCount: baselineReadings.length,
     acceptedCount: filteredReadings.length,
     rejectedCount: rejectedReadings.length,
@@ -129,15 +153,14 @@ function updateWaterData(currentReading) {
 function resetScanCycle() {
   baselineReadings = [];
   filteredReadings = [];
+  filteredDistances = [];
   rejectedReadings = [];
   baselineMedian = null;
   scanPhase = "baseline";
   completeStepsRemaining = 0;
 }
 
-function runMockScanStep() {
-  const reading = createMockSensorReading();
-
+function processWaterReading(reading, distanceCm) {
   if (scanPhase === "baseline") {
     baselineReadings.push(reading);
 
@@ -146,11 +169,13 @@ function runMockScanStep() {
       scanPhase = "filtered";
     }
   } else if (scanPhase === "filtered") {
-    const allowedMin = Math.max(0, baselineMedian - tolerancePercent);
-    const allowedMax = Math.min(100, baselineMedian + tolerancePercent);
+    const allowedRange = calculateAllowedRange(baselineMedian);
 
-    if (reading >= allowedMin && reading <= allowedMax) {
+    if (reading >= allowedRange.min && reading <= allowedRange.max) {
       filteredReadings.push(reading);
+      if (distanceCm !== null) {
+        filteredDistances.push(distanceCm);
+      }
     } else {
       rejectedReadings.push(reading);
     }
@@ -162,6 +187,10 @@ function runMockScanStep() {
       previousFinalAcceptedUpdatedAt = finalAcceptedUpdatedAt;
       finalAcceptedPercentage =
         filteredReadings.length > 0 ? calculateMean(filteredReadings) : baselineMedian;
+      finalAcceptedDistanceCm =
+        filteredDistances.length > 0
+          ? calculateMean(filteredDistances)
+          : calculateDistanceCm(finalAcceptedPercentage);
       finalAcceptedUpdatedAt = new Date().toISOString();
     }
   } else if (scanPhase === "complete" && completeStepsRemaining > 0) {
@@ -170,7 +199,26 @@ function runMockScanStep() {
     resetScanCycle();
   }
 
-  updateWaterData(reading);
+  updateWaterData(reading, distanceCm);
+}
+
+function switchDataSource(nextSource) {
+  if (dataSource !== nextSource) {
+    dataSource = nextSource;
+    resetScanCycle();
+  }
+}
+
+function runMockScanStep() {
+  const esp32IsRecentlyActive =
+    lastEsp32ReadingAt !== null && Date.now() - lastEsp32ReadingAt < esp32TimeoutMs;
+
+  if (dataSource === "esp32" && esp32IsRecentlyActive) {
+    return;
+  }
+
+  switchDataSource("mock");
+  processWaterReading(createMockSensorReading(), null);
 }
 
 runMockScanStep();
@@ -180,10 +228,10 @@ app.get("/api/water-level", (req, res) => {
   res.json(waterData);
 });
 
-// Future ESP32 endpoint. Expected body example: { "percentage": 72, "distanceCm": 10 }
+// ESP32 endpoint. Expected body example: { "percentage": 72, "distanceCm": 10 }
 app.post("/api/water-level", (req, res) => {
   const percentage = Number(req.body.percentage);
-  const distanceCm = Number(req.body.distanceCm);
+  const distanceCm = getCleanDistanceCm(req.body.distanceCm);
 
   if (Number.isNaN(percentage) || percentage < 0 || percentage > 100) {
     return res.status(400).json({
@@ -191,26 +239,12 @@ app.post("/api/water-level", (req, res) => {
     });
   }
 
-  waterData = {
-    percentage,
-    distanceCm: Number.isNaN(distanceCm) ? null : distanceCm,
-    status: getWaterStatus(percentage),
-    updatedAt: new Date().toISOString(),
-    previousPercentage: finalAcceptedPercentage,
-    previousUpdatedAt: finalAcceptedUpdatedAt,
-    scanPhase: "manual",
-    currentReading: percentage,
-    baselineMedian: null,
-    allowedMin: null,
-    allowedMax: null,
-    baselineCount: 0,
-    acceptedCount: 0,
-    rejectedCount: 0,
-    readingsNeeded: readingsPerScan
-  };
+  lastEsp32ReadingAt = Date.now();
+  switchDataSource("esp32");
+  processWaterReading(Math.round(percentage), distanceCm);
 
   res.json({
-    message: "Water level data received",
+    message: "ESP32 water level reading received",
     waterData
   });
 });

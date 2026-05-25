@@ -95,7 +95,11 @@ function createDemoData(scenarioKey) {
     previousPercentage: demoFilter.previousPercentage,
     previousUpdatedAt: demoFilter.previousUpdatedAt,
     scanPhase: demoFilter.phase,
-    currentReading
+    currentReading,
+    baselineCount: demoFilter.baselineReadings.length,
+    acceptedCount: demoFilter.filteredReadings.length,
+    rejectedCount: demoFilter.rejectedReadings.length,
+    readingsNeeded: readingsPerScan
   };
 }
 
@@ -127,10 +131,9 @@ function advanceDemoFilter(reading) {
   }
 
   if (demoFilter.phase === "filtered") {
-    const allowedMin = Math.max(0, demoFilter.baselineMedian - tolerancePercent);
-    const allowedMax = Math.min(100, demoFilter.baselineMedian + tolerancePercent);
+    const allowedRange = calculateAllowedRange(demoFilter.baselineMedian);
 
-    if (reading >= allowedMin && reading <= allowedMax) {
+    if (reading >= allowedRange.min && reading <= allowedRange.max) {
       demoFilter.filteredReadings.push(reading);
     } else {
       demoFilter.rejectedReadings.push(reading);
@@ -183,6 +186,15 @@ function calculateMockDistance(percentage) {
   const distanceRange = emptyDistanceCm - fullDistanceCm;
 
   return Math.round(emptyDistanceCm - (percentage / 100) * distanceRange);
+}
+
+function calculateAllowedRange(baseline) {
+  const toleranceAmount = baseline * (tolerancePercent / 100);
+
+  return {
+    min: Math.max(0, Math.round(baseline - toleranceAmount)),
+    max: Math.min(100, Math.round(baseline + toleranceAmount))
+  };
 }
 
 function calculateMedian(values) {
@@ -318,10 +330,85 @@ function updateCurrentReading(data, level, status) {
     previousLevel === null ? "No previous result" : previousLevel + "%";
   document.getElementById("last-reading").innerText =
     "Last reading: " + formatTimeOrWaiting(data.updatedAt, "waiting for sensor data");
+  updateScanProgress(data);
 
   const statusElement = document.getElementById("status");
   statusElement.innerText = status.text;
   statusElement.className = "status-text " + status.className;
+}
+
+function updateScanProgress(data) {
+  const progress = getScanProgress(data);
+  const progressBar = document.querySelector(".scan-progress-track");
+
+  document.getElementById("scan-progress-percent").innerText = progress.percent + "%";
+  document.getElementById("scan-progress-fill").style.width = progress.percent + "%";
+  document.getElementById("scan-progress-text").innerText = progress.text;
+  progressBar.setAttribute("aria-valuenow", String(progress.percent));
+}
+
+function getScanProgress(data) {
+  const needed = Number(data.readingsNeeded) || readingsPerScan;
+  const totalNeeded = needed * 2;
+  const baselineCount = Math.min(getPositiveNumber(data.baselineCount), needed);
+  const secondScanCount = Math.min(
+    getPositiveNumber(data.acceptedCount) + getPositiveNumber(data.rejectedCount),
+    needed
+  );
+  const completedReadings = Math.min(baselineCount + secondScanCount, totalNeeded);
+  const percent = Math.round((completedReadings / totalNeeded) * 100);
+  const remainingReadings = Math.max(0, totalNeeded - completedReadings);
+  const secondsRemaining = remainingReadings * 2;
+
+  if (data.scanPhase === "complete") {
+    return {
+      percent: 100,
+      text: "Final accepted value is ready"
+    };
+  }
+
+  if (data.scanPhase === "filtered") {
+    return {
+      percent,
+      text:
+        "Second scan: " +
+        secondScanCount +
+        " of " +
+        needed +
+        " readings, about " +
+        secondsRemaining +
+        " seconds remaining"
+    };
+  }
+
+  if (data.scanPhase === "baseline") {
+    return {
+      percent,
+      text:
+        "First scan: " +
+        baselineCount +
+        " of " +
+        needed +
+        " readings, about " +
+        secondsRemaining +
+        " seconds remaining"
+    };
+  }
+
+  return {
+    percent: 0,
+    text: "Waiting for readings"
+  };
+}
+
+function getPositiveNumber(value) {
+  const number = Number(value);
+
+  if (Number.isNaN(number) || number < 0) {
+    return 0;
+  }
+
+  return number;
 }
 
 function formatPhase(phase) {
