@@ -1,9 +1,50 @@
 const express = require("express");
 const cors = require("cors");
+const fs = require("fs");
 const path = require("path");
+const { DatabaseSync } = require("node:sqlite");
+
+function loadEnvFile() {
+  const envPath = path.join(__dirname, ".env");
+
+  if (!fs.existsSync(envPath)) {
+    return;
+  }
+
+  const lines = fs.readFileSync(envPath, "utf8").split(/\r?\n/);
+
+  lines.forEach((line) => {
+    const trimmedLine = line.trim();
+
+    if (trimmedLine === "" || trimmedLine.startsWith("#")) {
+      return;
+    }
+
+    const equalsIndex = trimmedLine.indexOf("=");
+
+    if (equalsIndex === -1) {
+      return;
+    }
+
+    const key = trimmedLine.slice(0, equalsIndex).trim();
+    const value = trimmedLine.slice(equalsIndex + 1).trim();
+
+    if (process.env[key] === undefined) {
+      process.env[key] = value;
+    }
+  });
+}
+
+loadEnvFile();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const esp32ApiKey = process.env.ESP32_API_KEY || "";
+const apiKeyIsRequired = esp32ApiKey !== "";
+const databaseFile = process.env.DATABASE_FILE || "data/water-level.db";
+const databasePath = path.isAbsolute(databaseFile)
+  ? databaseFile
+  : path.join(__dirname, databaseFile);
 
 app.use(cors());
 app.use(express.json());
@@ -71,11 +112,69 @@ function createMockSensorReading() {
   return Math.max(0, Math.min(100, stableWaterLevel + normalMovement));
 }
 
-const readingsPerScan = 15;
-const scanIntervalMs = 2000;
-const tolerancePercent = 10;
-const stableDisplaySteps = 5;
-const esp32TimeoutMs = 30000;
+const readingsPerScan = Number(process.env.READINGS_PER_SCAN) || 15;
+const scanIntervalMs = Number(process.env.SCAN_INTERVAL_MS) || 2000;
+const tolerancePercent = Number(process.env.TOLERANCE_PERCENT) || 10;
+const stableDisplaySteps = Number(process.env.STABLE_DISPLAY_STEPS) || 5;
+const esp32TimeoutMs = Number(process.env.ESP32_TIMEOUT_MS) || 30000;
+
+fs.mkdirSync(path.dirname(databasePath), { recursive: true });
+
+const database = new DatabaseSync(databasePath);
+
+database.exec(`
+  CREATE TABLE IF NOT EXISTS raw_readings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at TEXT NOT NULL,
+    source TEXT NOT NULL,
+    percentage INTEGER NOT NULL,
+    distance_cm REAL,
+    scan_phase TEXT NOT NULL,
+    filter_result TEXT NOT NULL,
+    baseline_median INTEGER,
+    allowed_min INTEGER,
+    allowed_max INTEGER
+  );
+
+  CREATE TABLE IF NOT EXISTS stable_readings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at TEXT NOT NULL,
+    source TEXT NOT NULL,
+    percentage INTEGER NOT NULL,
+    distance_cm REAL,
+    status TEXT NOT NULL,
+    accepted_count INTEGER NOT NULL,
+    rejected_count INTEGER NOT NULL,
+    baseline_median INTEGER
+  );
+`);
+
+const insertRawReading = database.prepare(`
+  INSERT INTO raw_readings (
+    created_at,
+    source,
+    percentage,
+    distance_cm,
+    scan_phase,
+    filter_result,
+    baseline_median,
+    allowed_min,
+    allowed_max
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+`);
+
+const insertStableReading = database.prepare(`
+  INSERT INTO stable_readings (
+    created_at,
+    source,
+    percentage,
+    distance_cm,
+    status,
+    accepted_count,
+    rejected_count,
+    baseline_median
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+`);
 
 let baselineReadings = [];
 let filteredReadings = [];
@@ -103,6 +202,8 @@ let waterData = {
   currentReading: null,
   currentDistanceCm: null,
   dataSource,
+  esp32Status: "offline",
+  lastEsp32ReadingAt: null,
   baselineMedian,
   allowedMin: null,
   allowedMax: null,
@@ -120,6 +221,64 @@ function getCleanDistanceCm(distanceCm) {
   }
 
   return cleanDistance;
+}
+
+function getEsp32Status() {
+  const isOnline =
+    lastEsp32ReadingAt !== null && Date.now() - lastEsp32ReadingAt < esp32TimeoutMs;
+
+  return isOnline ? "online" : "offline";
+}
+
+function isValidApiKey(req) {
+  if (!apiKeyIsRequired) {
+    return true;
+  }
+
+  return req.get("x-api-key") === esp32ApiKey;
+}
+
+function saveRawReading(reading, distanceCm, filterResult) {
+  const allowedRange = baselineMedian === null ? null : calculateAllowedRange(baselineMedian);
+
+  insertRawReading.run(
+    new Date().toISOString(),
+    dataSource,
+    reading,
+    distanceCm,
+    scanPhase,
+    filterResult,
+    baselineMedian,
+    allowedRange === null ? null : allowedRange.min,
+    allowedRange === null ? null : allowedRange.max
+  );
+}
+
+function saveStableReading() {
+  if (finalAcceptedPercentage === null) {
+    return;
+  }
+
+  insertStableReading.run(
+    finalAcceptedUpdatedAt,
+    dataSource,
+    finalAcceptedPercentage,
+    finalAcceptedDistanceCm,
+    getWaterStatus(finalAcceptedPercentage),
+    filteredReadings.length,
+    rejectedReadings.length,
+    baselineMedian
+  );
+}
+
+function getSafeLimit(value, defaultLimit) {
+  const limit = Number(value);
+
+  if (Number.isNaN(limit) || limit < 1) {
+    return defaultLimit;
+  }
+
+  return Math.min(Math.round(limit), 200);
 }
 
 function updateWaterData(currentReading, currentDistanceCm) {
@@ -140,6 +299,9 @@ function updateWaterData(currentReading, currentDistanceCm) {
     currentReading,
     currentDistanceCm,
     dataSource,
+    esp32Status: getEsp32Status(),
+    lastEsp32ReadingAt:
+      lastEsp32ReadingAt === null ? null : new Date(lastEsp32ReadingAt).toISOString(),
     baselineMedian,
     allowedMin: allowedRange === null ? null : allowedRange.min,
     allowedMax: allowedRange === null ? null : allowedRange.max,
@@ -161,8 +323,12 @@ function resetScanCycle() {
 }
 
 function processWaterReading(reading, distanceCm) {
+  let filterResult = "waiting";
+  let stableReadingIsReady = false;
+
   if (scanPhase === "baseline") {
     baselineReadings.push(reading);
+    filterResult = "baseline";
 
     if (baselineReadings.length === readingsPerScan) {
       baselineMedian = calculateMedian(baselineReadings);
@@ -173,11 +339,13 @@ function processWaterReading(reading, distanceCm) {
 
     if (reading >= allowedRange.min && reading <= allowedRange.max) {
       filteredReadings.push(reading);
+      filterResult = "accepted";
       if (distanceCm !== null) {
         filteredDistances.push(distanceCm);
       }
     } else {
       rejectedReadings.push(reading);
+      filterResult = "rejected";
     }
 
     if (filteredReadings.length + rejectedReadings.length === readingsPerScan) {
@@ -192,14 +360,22 @@ function processWaterReading(reading, distanceCm) {
           ? calculateMean(filteredDistances)
           : calculateDistanceCm(finalAcceptedPercentage);
       finalAcceptedUpdatedAt = new Date().toISOString();
+      stableReadingIsReady = true;
     }
   } else if (scanPhase === "complete" && completeStepsRemaining > 0) {
     completeStepsRemaining -= 1;
+    filterResult = "stable_display";
   } else {
     resetScanCycle();
+    filterResult = "cycle_restart";
   }
 
   updateWaterData(reading, distanceCm);
+  saveRawReading(reading, distanceCm, filterResult);
+
+  if (stableReadingIsReady) {
+    saveStableReading();
+  }
 }
 
 function switchDataSource(nextSource) {
@@ -225,11 +401,55 @@ runMockScanStep();
 setInterval(runMockScanStep, scanIntervalMs);
 
 app.get("/api/water-level", (req, res) => {
+  waterData.esp32Status = getEsp32Status();
   res.json(waterData);
+});
+
+app.get("/api/health", (req, res) => {
+  res.json({
+    status: "ok",
+    uptimeSeconds: Math.round(process.uptime()),
+    dataSource,
+    esp32Status: getEsp32Status(),
+    lastEsp32ReadingAt:
+      lastEsp32ReadingAt === null ? null : new Date(lastEsp32ReadingAt).toISOString(),
+    apiKeyRequired: apiKeyIsRequired,
+    databaseFile
+  });
+});
+
+app.get("/api/readings/recent", (req, res) => {
+  const limit = getSafeLimit(req.query.limit, 50);
+  const readings = database
+    .prepare("SELECT * FROM raw_readings ORDER BY id DESC LIMIT ?")
+    .all(limit);
+
+  res.json({
+    count: readings.length,
+    readings
+  });
+});
+
+app.get("/api/stable-readings/recent", (req, res) => {
+  const limit = getSafeLimit(req.query.limit, 31);
+  const readings = database
+    .prepare("SELECT * FROM stable_readings ORDER BY id DESC LIMIT ?")
+    .all(limit);
+
+  res.json({
+    count: readings.length,
+    readings
+  });
 });
 
 // ESP32 endpoint. Expected body example: { "percentage": 72, "distanceCm": 10 }
 app.post("/api/water-level", (req, res) => {
+  if (!isValidApiKey(req)) {
+    return res.status(401).json({
+      error: "Invalid or missing API key"
+    });
+  }
+
   const percentage = Number(req.body.percentage);
   const distanceCm = getCleanDistanceCm(req.body.distanceCm);
 

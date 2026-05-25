@@ -99,7 +99,10 @@ function createDemoData(scenarioKey) {
     baselineCount: demoFilter.baselineReadings.length,
     acceptedCount: demoFilter.filteredReadings.length,
     rejectedCount: demoFilter.rejectedReadings.length,
-    readingsNeeded: readingsPerScan
+    readingsNeeded: readingsPerScan,
+    dataSource: "demo",
+    esp32Status: "offline",
+    currentDistanceCm: calculateMockDistance(currentReading)
   };
 }
 
@@ -319,15 +322,22 @@ function getStatusChipClass(key) {
 function updateCurrentReading(data, level, status) {
   const percentageText = level === null ? "--%" : level + "%";
   const distanceText = data.distanceCm == null ? "-- cm" : data.distanceCm + " cm";
+  const rawReading = getNumberOrNull(data.currentReading);
+  const rawDistance = getNumberOrNull(data.currentDistanceCm);
+  const rawText = rawReading === null ? "--%" : rawReading + "%";
+  const rawDistanceText = rawDistance === null ? "" : " / " + rawDistance + " cm";
   const previousLevel = getNumberOrNull(data.previousPercentage);
 
   document.getElementById("level").innerText = percentageText;
   document.getElementById("gauge-percent").innerText = percentageText;
   document.getElementById("gauge-fill").style.height = level === null ? "0%" : level + "%";
   document.getElementById("distance").innerText = distanceText;
+  document.getElementById("raw-reading").innerText = rawText + rawDistanceText;
   document.getElementById("scan-phase").innerText = formatPhase(data.scanPhase);
   document.getElementById("previous-level").innerText =
     previousLevel === null ? "No previous result" : previousLevel + "%";
+  document.getElementById("data-source").innerText = formatDataSource(data.dataSource);
+  document.getElementById("esp32-status").innerText = formatEsp32Status(data.esp32Status);
   document.getElementById("last-reading").innerText =
     "Last reading: " + formatTimeOrWaiting(data.updatedAt, "waiting for sensor data");
   updateScanProgress(data);
@@ -409,6 +419,26 @@ function getPositiveNumber(value) {
   }
 
   return number;
+}
+
+function formatDataSource(source) {
+  if (source === "esp32") {
+    return "ESP32";
+  }
+
+  if (source === "demo") {
+    return "Demo";
+  }
+
+  return "Mock";
+}
+
+function formatEsp32Status(status) {
+  if (status === "online") {
+    return "Online";
+  }
+
+  return "Offline";
 }
 
 function formatPhase(phase) {
