@@ -66,6 +66,22 @@ function getWaterStatus(percentage) {
   return "Low Sea Level";
 }
 
+function getStatusKey(percentage) {
+  if (percentage >= 90) {
+    return "flooding";
+  }
+
+  if (percentage >= 80) {
+    return "veryHigh";
+  }
+
+  if (percentage >= 50) {
+    return "high";
+  }
+
+  return "low";
+}
+
 function calculateMedian(values) {
   const sortedValues = [...values].sort((a, b) => a - b);
   const middle = Math.floor(sortedValues.length / 2);
@@ -287,6 +303,176 @@ function getSafeLimit(value, defaultLimit) {
   return Math.min(Math.round(limit), 200);
 }
 
+function getSafeDays(value, defaultDays) {
+  const days = Number(value);
+
+  if (Number.isNaN(days) || days < 1) {
+    return defaultDays;
+  }
+
+  return Math.min(Math.round(days), 31);
+}
+
+function getTimeBlockLabel(index) {
+  return ["12AM-6AM", "6AM-12PM", "12PM-6PM", "6PM-12AM"][index];
+}
+
+function getTimeBlockIndex(date) {
+  const hour = date.getHours();
+
+  if (hour < 6) {
+    return 0;
+  }
+
+  if (hour < 12) {
+    return 1;
+  }
+
+  if (hour < 18) {
+    return 2;
+  }
+
+  return 3;
+}
+
+function formatDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return year + "-" + month + "-" + day;
+}
+
+function createEmptyCounts() {
+  return {
+    low: 0,
+    high: 0,
+    veryHigh: 0,
+    flooding: 0
+  };
+}
+
+function getStableRowsForDays(days) {
+  const since = new Date();
+  since.setDate(since.getDate() - (days - 1));
+  since.setHours(0, 0, 0, 0);
+
+  return database
+    .prepare(
+      "SELECT * FROM stable_readings WHERE created_at >= ? ORDER BY created_at DESC"
+    )
+    .all(since.toISOString());
+}
+
+function buildDailyHistory(days) {
+  const rows = getStableRowsForDays(days);
+  const map = new Map();
+
+  rows.forEach((row) => {
+    const date = new Date(row.created_at);
+    const dateKey = formatDateKey(date);
+
+    if (!map.has(dateKey)) {
+      map.set(dateKey, {
+        dateKey,
+        displayDate: date.toLocaleDateString(),
+        blocks: [0, 1, 2, 3].map((index) => ({
+          label: getTimeBlockLabel(index),
+          samples: []
+        })),
+        samples: [],
+        counts: createEmptyCounts()
+      });
+    }
+
+    const record = map.get(dateKey);
+    const level = Number(row.percentage);
+    const statusKey = getStatusKey(level);
+    const blockIndex = getTimeBlockIndex(date);
+
+    record.blocks[blockIndex].samples.push(level);
+    record.samples.push(level);
+    record.counts[statusKey] += 1;
+  });
+
+  return Array.from(map.values()).map((record) => {
+    const highest = Math.max(...record.samples);
+    const lowest = Math.min(...record.samples);
+    const average = calculateMean(record.samples);
+
+    return {
+      dateKey: record.dateKey,
+      displayDate: record.displayDate,
+      blocks: record.blocks.map((block) => ({
+        label: block.label,
+        average: block.samples.length === 0 ? null : calculateMean(block.samples)
+      })),
+      average,
+      highest,
+      lowest,
+      counts: record.counts,
+      reached: Object.keys(record.counts).filter((key) => record.counts[key] > 0),
+      dailyRisk: getStatusKey(highest),
+      readingCount: record.samples.length
+    };
+  });
+}
+
+function buildMonthlyHistory() {
+  const rows = database
+    .prepare("SELECT * FROM stable_readings ORDER BY created_at DESC LIMIT 1000")
+    .all();
+  const map = new Map();
+
+  rows.forEach((row) => {
+    const date = new Date(row.created_at);
+    const monthKey =
+      date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0");
+
+    if (!map.has(monthKey)) {
+      map.set(monthKey, {
+        monthKey,
+        displayMonth: date.toLocaleDateString(undefined, {
+          month: "long",
+          year: "numeric"
+        }),
+        samples: [],
+        floodingDays: new Set(),
+        veryHighDays: new Set()
+      });
+    }
+
+    const record = map.get(monthKey);
+    const level = Number(row.percentage);
+    const dateKey = formatDateKey(date);
+
+    record.samples.push(level);
+
+    if (level >= 90) {
+      record.floodingDays.add(dateKey);
+    } else if (level >= 80) {
+      record.veryHighDays.add(dateKey);
+    }
+  });
+
+  return Array.from(map.values()).map((record) => {
+    const highest = Math.max(...record.samples);
+    const lowest = Math.min(...record.samples);
+
+    return {
+      monthKey: record.monthKey,
+      displayMonth: record.displayMonth,
+      average: calculateMean(record.samples),
+      highest,
+      lowest,
+      floodingDays: record.floodingDays.size,
+      veryHighDays: record.veryHighDays.size,
+      monthlyRisk: getStatusKey(highest),
+      readingCount: record.samples.length
+    };
+  });
+}
+
 function updateWaterData(currentReading, currentDistanceCm) {
   const allowedRange = baselineMedian === null ? null : calculateAllowedRange(baselineMedian);
 
@@ -450,6 +636,54 @@ app.get("/api/stable-readings/recent", (req, res) => {
   res.json({
     count: readings.length,
     readings
+  });
+});
+
+app.get("/api/history/daily", (req, res) => {
+  const days = getSafeDays(req.query.days, 7);
+  const records = buildDailyHistory(days);
+
+  res.json({
+    count: records.length,
+    days,
+    records
+  });
+});
+
+app.get("/api/history/monthly", (req, res) => {
+  const records = buildMonthlyHistory();
+
+  res.json({
+    count: records.length,
+    records
+  });
+});
+
+app.get("/api/alerts/recent", (req, res) => {
+  const limit = getSafeLimit(req.query.limit, 50);
+  const alerts = database
+    .prepare(
+      "SELECT * FROM stable_readings WHERE percentage >= 80 ORDER BY id DESC LIMIT ?"
+    )
+    .all(limit);
+
+  res.json({
+    count: alerts.length,
+    alerts
+  });
+});
+
+app.get("/api/calibration", (req, res) => {
+  res.json({
+    sensorFullDistanceCm,
+    sensorFullScalePercent,
+    sensorUsableDistanceCm: Number(sensorUsableDistanceCm.toFixed(2)),
+    sensorDistanceAtZeroPercentCm: sensorFullDistanceCm,
+    sensorDistanceAtFullPercentCm: Number(calculateDistanceCm(100).toFixed(2)),
+    tolerancePercent,
+    readingsPerScan,
+    scanIntervalMs,
+    esp32TimeoutMs
   });
 });
 

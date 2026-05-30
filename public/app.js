@@ -51,6 +51,9 @@ let demoFilter = createEmptyDemoFilter();
 const historyReadings = createMockHistory(demoScenarios.api);
 const dailyTableLimit = 31;
 const dailyHistoryRecords = createDailyHistoryRecords(186);
+let activeDailyHistoryRecords = dailyHistoryRecords.slice(0, 7);
+let activeMonthlyHistoryRecords = createMonthlyHistoryRecords();
+let activeAlertRecords = [];
 
 function createMockHistory(scenario) {
   const readings = [];
@@ -337,6 +340,14 @@ function updateCurrentReading(data, level, status) {
     previousLevel === null ? "No previous result" : previousLevel + "%";
   document.getElementById("data-source").innerText = formatDataSource(data.dataSource);
   document.getElementById("esp32-status").innerText = formatEsp32Status(data.esp32Status);
+  document.getElementById("baseline-median").innerText =
+    data.baselineMedian == null ? "--%" : data.baselineMedian + "%";
+  document.getElementById("allowed-range").innerText =
+    data.allowedMin == null || data.allowedMax == null
+      ? "Waiting"
+      : data.allowedMin + "% - " + data.allowedMax + "%";
+  document.getElementById("accepted-rejected").innerText =
+    getPositiveNumber(data.acceptedCount) + " / " + getPositiveNumber(data.rejectedCount);
   document.getElementById("last-reading").innerText =
     "Last reading: " + formatTimeOrWaiting(data.updatedAt, "waiting for sensor data");
   updateScanProgress(data);
@@ -656,16 +667,43 @@ function formatDateKey(date) {
   return year + "-" + month + "-" + day;
 }
 
-function renderHistoryPage() {
+async function renderHistoryPage() {
+  try {
+    const days = Number(document.getElementById("history-range").value);
+    const [dailyData, monthlyData, alertData] = await Promise.all([
+      fetchJson("/api/history/daily?days=" + days),
+      fetchJson("/api/history/monthly"),
+      fetchJson("/api/alerts/recent?limit=50")
+    ]);
+
+    activeDailyHistoryRecords = dailyData.records || [];
+    activeMonthlyHistoryRecords = monthlyData.records || [];
+    activeAlertRecords = alertData.alerts || [];
+  } catch (error) {
+    activeDailyHistoryRecords = [];
+    activeMonthlyHistoryRecords = [];
+    activeAlertRecords = [];
+  }
+
   renderHistoryDateOptions();
   renderHistoryTable();
   renderMonthlyHistory();
+  renderAlertLog();
   updateSelectedDayHistory();
 }
 
+async function fetchJson(url) {
+  const res = await fetch(url);
+
+  if (!res.ok) {
+    throw new Error("Request failed");
+  }
+
+  return res.json();
+}
+
 function getFilteredHistoryRecords() {
-  const days = Number(document.getElementById("history-range").value);
-  return dailyHistoryRecords.slice(0, Math.min(days, dailyTableLimit));
+  return activeDailyHistoryRecords.slice(0, dailyTableLimit);
 }
 
 function renderHistoryDateOptions() {
@@ -688,10 +726,17 @@ function renderHistoryTable() {
   const records = getFilteredHistoryRecords();
   const body = document.getElementById("daily-summary-body");
 
+  if (records.length === 0) {
+    body.innerHTML =
+      '<tr><td colspan="9">No saved stable readings yet.</td></tr>';
+    document.getElementById("history-table-count").innerText = "0 records";
+    return;
+  }
+
   body.innerHTML = records
     .map((record) => {
       const blockCells = record.blocks
-        .map((block) => "<td>" + block.average + "%</td>")
+        .map((block) => "<td>" + formatPercentOrDash(block.average) + "</td>")
         .join("");
 
       return (
@@ -750,8 +795,16 @@ function createMonthlyHistoryRecords() {
 }
 
 function renderMonthlyHistory() {
-  const monthlyRecords = createMonthlyHistoryRecords();
+  const monthlyRecords = activeMonthlyHistoryRecords;
   const body = document.getElementById("monthly-summary-body");
+
+  if (monthlyRecords.length === 0) {
+    body.innerHTML =
+      '<tr><td colspan="7">No saved stable readings yet.</td></tr>';
+    document.getElementById("monthly-summary-count").innerText = "0 months";
+    drawMonthlyChart([]);
+    return;
+  }
 
   body.innerHTML = monthlyRecords
     .map((record) => {
@@ -778,6 +831,10 @@ function renderReachedChips(keys) {
   return keys.map(renderStatusChip).join("");
 }
 
+function formatPercentOrDash(value) {
+  return value == null ? "--" : value + "%";
+}
+
 function renderStatusChip(key) {
   return (
     '<span class="level-chip ' +
@@ -788,12 +845,73 @@ function renderStatusChip(key) {
   );
 }
 
+function renderAlertLog() {
+  const body = document.getElementById("alert-log-body");
+
+  if (activeAlertRecords.length === 0) {
+    body.innerHTML =
+      '<tr><td colspan="7">No Very High or Flooding stable readings saved yet.</td></tr>';
+    document.getElementById("alert-log-count").innerText = "0 alerts";
+    return;
+  }
+
+  body.innerHTML = activeAlertRecords
+    .map((alert) => {
+      const level = Number(alert.percentage);
+      const statusKey = getStatusKey(level);
+
+      return (
+        "<tr>" +
+        "<td>" + formatDateTime(alert.created_at) + "</td>" +
+        "<td>" + level + "%</td>" +
+        "<td>" + formatDistance(alert.distance_cm) + "</td>" +
+        "<td>" + renderStatusChip(statusKey) + "</td>" +
+        "<td>" + formatDataSource(alert.source) + "</td>" +
+        "<td>" + alert.accepted_count + "</td>" +
+        "<td>" + alert.rejected_count + "</td>" +
+        "</tr>"
+      );
+    })
+    .join("");
+
+  document.getElementById("alert-log-count").innerText =
+    activeAlertRecords.length + " alerts";
+}
+
+function formatDateTime(value) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown";
+  }
+
+  return date.toLocaleString();
+}
+
+function formatDistance(value) {
+  const number = Number(value);
+
+  if (Number.isNaN(number)) {
+    return "-- cm";
+  }
+
+  return Math.round(number) + " cm";
+}
+
 function updateSelectedDayHistory() {
   const selectedDate = document.getElementById("history-date").value;
   const records = getFilteredHistoryRecords();
   const record = records.find((item) => item.dateKey === selectedDate) || records[0];
 
   if (!record) {
+    document.getElementById("day-average").innerText = "--%";
+    document.getElementById("day-highest").innerText = "--%";
+    document.getElementById("day-lowest").innerText = "--%";
+    document.getElementById("day-risk").innerText = "No saved data";
+    document.getElementById("selected-day-label").innerText = "No saved data";
+    document.getElementById("warning-counts").innerHTML =
+      "<div><span>Saved stable readings</span><strong>0 readings</strong></div>";
+    drawDailyTrendChart(null);
     return;
   }
 
@@ -841,7 +959,15 @@ function drawDailyTrendChart(record) {
   ctx.clearRect(0, 0, width, height);
   drawGrid(ctx, width, height, padding, chartWidth, chartHeight);
 
+  if (record === null) {
+    return;
+  }
+
   record.blocks.forEach((block, index) => {
+    if (block.average === null) {
+      return;
+    }
+
     const x = padding + index * (barWidth + barGap);
     const barHeight = (block.average / 100) * chartHeight;
     const y = height - padding - barHeight;
@@ -867,11 +993,16 @@ function drawMonthlyChart(records) {
   const chartWidth = width - padding * 2;
   const chartHeight = height - padding * 2;
   const recordsToShow = records.slice(0, 6).reverse();
-  const barGap = 18;
-  const barWidth = (chartWidth - barGap * (recordsToShow.length - 1)) / recordsToShow.length;
 
   ctx.clearRect(0, 0, width, height);
   drawGrid(ctx, width, height, padding, chartWidth, chartHeight);
+
+  if (recordsToShow.length === 0) {
+    return;
+  }
+
+  const barGap = 18;
+  const barWidth = (chartWidth - barGap * (recordsToShow.length - 1)) / recordsToShow.length;
 
   recordsToShow.forEach((record, index) => {
     const x = padding + index * (barWidth + barGap);
@@ -901,16 +1032,60 @@ function getBarColor(status) {
   return colors[status];
 }
 
+async function renderAboutPage() {
+  try {
+    const [health, calibration] = await Promise.all([
+      fetchJson("/api/health"),
+      fetchJson("/api/calibration")
+    ]);
+
+    document.getElementById("about-health-status").innerText =
+      "Server online";
+    document.getElementById("about-server-status").innerText =
+      "Online for " + health.uptimeSeconds + " seconds";
+    document.getElementById("about-database-file").innerText = health.databaseFile;
+    document.getElementById("about-api-key").innerText =
+      health.apiKeyRequired ? "Enabled" : "Disabled";
+    document.getElementById("about-esp32-status").innerText =
+      formatEsp32Status(health.esp32Status);
+    document.getElementById("cal-full-distance").innerText =
+      calibration.sensorFullDistanceCm + " cm";
+    document.getElementById("cal-full-scale").innerText =
+      calibration.sensorFullScalePercent + "%";
+    document.getElementById("cal-usable-distance").innerText =
+      calibration.sensorUsableDistanceCm + " cm";
+    document.getElementById("cal-full-level-distance").innerText =
+      calibration.sensorDistanceAtFullPercentCm + " cm";
+    document.getElementById("about-scan-settings").innerText =
+      calibration.readingsPerScan +
+      " + " +
+      calibration.readingsPerScan +
+      " readings, " +
+      calibration.tolerancePercent +
+      "% tolerance";
+  } catch (error) {
+    document.getElementById("about-health-status").innerText =
+      "Unable to load system status";
+  }
+}
+
 function showPage(pageName) {
   const isHistory = pageName === "history";
+  const isAbout = pageName === "about";
 
-  document.getElementById("dashboard-view").classList.toggle("active", !isHistory);
+  document.getElementById("dashboard-view").classList.toggle("active", !isHistory && !isAbout);
   document.getElementById("history-view").classList.toggle("active", isHistory);
-  document.getElementById("dashboard-tab").classList.toggle("active", !isHistory);
+  document.getElementById("about-view").classList.toggle("active", isAbout);
+  document.getElementById("dashboard-tab").classList.toggle("active", !isHistory && !isAbout);
   document.getElementById("history-tab").classList.toggle("active", isHistory);
+  document.getElementById("about-tab").classList.toggle("active", isAbout);
 
   if (isHistory) {
     renderHistoryPage();
+  }
+
+  if (isAbout) {
+    renderAboutPage();
   }
 }
 
@@ -921,11 +1096,9 @@ document.getElementById("scenario-select").addEventListener("change", (event) =>
 });
 document.getElementById("dashboard-tab").addEventListener("click", () => showPage("dashboard"));
 document.getElementById("history-tab").addEventListener("click", () => showPage("history"));
+document.getElementById("about-tab").addEventListener("click", () => showPage("about"));
 document.getElementById("history-range").addEventListener("change", () => {
-  renderHistoryDateOptions();
-  renderHistoryTable();
-  renderMonthlyHistory();
-  updateSelectedDayHistory();
+  renderHistoryPage();
 });
 document.getElementById("history-date").addEventListener("change", updateSelectedDayHistory);
 setInterval(loadData, 2000);

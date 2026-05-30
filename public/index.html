@@ -23,6 +23,7 @@
           <nav class="page-tabs" aria-label="Main pages">
             <button id="dashboard-tab" class="page-tab active" type="button">Dashboard</button>
             <button id="history-tab" class="page-tab" type="button">History</button>
+            <button id="about-tab" class="page-tab" type="button">About</button>
           </nav>
           <button class="icon-button" type="button" aria-label="Settings">&#9881;</button>
         </div>
@@ -102,6 +103,18 @@
               <div>
                 <span>ESP32 Status</span>
                 <strong id="esp32-status">Offline</strong>
+              </div>
+              <div>
+                <span>Baseline Median</span>
+                <strong id="baseline-median">--%</strong>
+              </div>
+              <div>
+                <span>Allowed Range</span>
+                <strong id="allowed-range">Waiting</strong>
+              </div>
+              <div>
+                <span>Accepted / Rejected</span>
+                <strong id="accepted-rejected">0 / 0</strong>
               </div>
             </div>
 
@@ -255,6 +268,115 @@
                 <tbody id="monthly-summary-body"></tbody>
               </table>
             </div>
+          </div>
+        </section>
+
+        <section class="history-panel monthly-panel">
+          <div class="chart-header">
+            <div>
+              <p class="section-label">Alert Log</p>
+              <h2>Very High and Flooding Events</h2>
+            </div>
+            <span id="alert-log-count">0 alerts</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date/Time</th>
+                  <th>Level</th>
+                  <th>Distance</th>
+                  <th>Status</th>
+                  <th>Source</th>
+                  <th>Accepted</th>
+                  <th>Rejected</th>
+                </tr>
+              </thead>
+              <tbody id="alert-log-body"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <section id="about-view" class="page-view history-page" aria-label="Project method and calibration information">
+        <section class="history-filter">
+          <div>
+            <p class="section-label">Project Method</p>
+            <h2>ESP32 Sea Water Level Monitoring</h2>
+          </div>
+          <span id="about-health-status">Checking system</span>
+        </section>
+
+        <section class="history-cards calibration-cards" aria-label="Calibration values">
+          <div>
+            <span>Full Distance</span>
+            <strong id="cal-full-distance">-- cm</strong>
+          </div>
+          <div>
+            <span>Full Scale</span>
+            <strong id="cal-full-scale">--%</strong>
+          </div>
+          <div>
+            <span>Usable Range</span>
+            <strong id="cal-usable-distance">-- cm</strong>
+          </div>
+          <div>
+            <span>100% Distance</span>
+            <strong id="cal-full-level-distance">-- cm</strong>
+          </div>
+        </section>
+
+        <section class="history-layout">
+          <div class="history-panel">
+            <p class="section-label">System Diagram</p>
+            <div class="system-diagram" aria-label="Ultrasonic Sensor to ESP32 to Express API to SQLite to Dashboard and History">
+              <span>Ultrasonic Sensor</span>
+              <span>ESP32</span>
+              <span>Express API</span>
+              <span>SQLite</span>
+              <span>Dashboard</span>
+              <span>History</span>
+            </div>
+          </div>
+
+          <div class="history-panel warning-panel">
+            <p class="section-label">System Status</p>
+            <h2>Runtime Check</h2>
+            <div class="warning-counts">
+              <div>
+                <span>Server</span>
+                <strong id="about-server-status">--</strong>
+              </div>
+              <div>
+                <span>Database</span>
+                <strong id="about-database-file">--</strong>
+              </div>
+              <div>
+                <span>API Key</span>
+                <strong id="about-api-key">--</strong>
+              </div>
+              <div>
+                <span>ESP32</span>
+                <strong id="about-esp32-status">--</strong>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="history-panel monthly-panel">
+          <div class="chart-header">
+            <div>
+              <p class="section-label">Two-Scan Filtering</p>
+              <h2>How the Stable Value Is Calculated</h2>
+            </div>
+            <span id="about-scan-settings">15 + 15 readings</span>
+          </div>
+          <div class="method-steps">
+            <div><span>1</span><strong>Collect 15 baseline readings.</strong></div>
+            <div><span>2</span><strong>Calculate the median baseline.</strong></div>
+            <div><span>3</span><strong>Collect 15 more readings.</strong></div>
+            <div><span>4</span><strong>Accept readings inside baseline +/- tolerance.</strong></div>
+            <div><span>5</span><strong>Average accepted readings for the final value.</strong></div>
           </div>
         </section>
       </section>

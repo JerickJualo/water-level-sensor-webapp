@@ -386,6 +386,7 @@ h1 {
   display: block;
   margin-top: 6px;
   font-size: 1.05rem;
+  overflow-wrap: anywhere;
 }
 
 .scan-progress {
@@ -542,6 +543,73 @@ h1 {
 
 .monthly-table {
   min-width: 760px;
+}
+
+.calibration-cards {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.system-diagram {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.system-diagram span {
+  position: relative;
+  min-height: 72px;
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fbfd;
+  color: var(--text);
+  font-weight: 800;
+  text-align: center;
+}
+
+.system-diagram span:not(:last-child)::after {
+  content: ">";
+  position: absolute;
+  right: -10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--blue-dark);
+  font-weight: 900;
+  z-index: 1;
+}
+
+.method-steps {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.method-steps div {
+  min-height: 110px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fbfd;
+}
+
+.method-steps span {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #ffffff;
+  background: var(--blue-dark);
+  font-weight: 900;
+}
+
+.method-steps strong {
+  display: block;
+  margin-top: 12px;
+  line-height: 1.35;
 }
 
 .warning-counts {
@@ -719,8 +787,20 @@ h2 {
   .history-filter,
   .history-cards,
   .history-layout,
-  .monthly-layout {
+  .monthly-layout,
+  .calibration-cards,
+  .system-diagram,
+  .method-steps {
     grid-template-columns: 1fr;
+  }
+
+  .system-diagram span:not(:last-child)::after {
+    content: "v";
+    right: auto;
+    top: auto;
+    bottom: -13px;
+    left: 50%;
+    transform: translateX(-50%);
   }
 
   .page-tabs,
