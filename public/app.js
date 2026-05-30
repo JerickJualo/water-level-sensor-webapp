@@ -2,6 +2,9 @@ const historyLimit = 36;
 const readingsPerScan = 15;
 const tolerancePercent = 10;
 const stableDisplaySteps = 5;
+const sensorFullDistanceCm = 230;
+const sensorFullScalePercent = 120;
+const sensorUsableDistanceCm = sensorFullDistanceCm / (sensorFullScalePercent / 100);
 const demoScenarios = {
   api: {
     name: "ESP32-ready API data",
@@ -184,11 +187,7 @@ function createScenarioReading(scenario, index) {
 }
 
 function calculateMockDistance(percentage) {
-  const emptyDistanceCm = 30;
-  const fullDistanceCm = 5;
-  const distanceRange = emptyDistanceCm - fullDistanceCm;
-
-  return Math.round(emptyDistanceCm - (percentage / 100) * distanceRange);
+  return Math.round(sensorFullDistanceCm - (percentage / 100) * sensorUsableDistanceCm);
 }
 
 function calculateAllowedRange(baseline) {

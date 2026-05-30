@@ -83,11 +83,14 @@ function calculateMean(values) {
 }
 
 function calculateDistanceCm(percentage) {
-  const emptyDistanceCm = 30;
-  const fullDistanceCm = 5;
-  const distanceRange = emptyDistanceCm - fullDistanceCm;
+  return Math.round(sensorFullDistanceCm - (percentage / 100) * sensorUsableDistanceCm);
+}
 
-  return Math.round(emptyDistanceCm - (percentage / 100) * distanceRange);
+function calculatePercentageFromDistance(distanceCm) {
+  const waterHeightCm = sensorFullDistanceCm - distanceCm;
+  const percentage = (waterHeightCm / sensorUsableDistanceCm) * 100;
+
+  return Math.round(Math.max(0, Math.min(100, percentage)));
 }
 
 function calculateAllowedRange(baseline) {
@@ -117,6 +120,9 @@ const scanIntervalMs = Number(process.env.SCAN_INTERVAL_MS) || 2000;
 const tolerancePercent = Number(process.env.TOLERANCE_PERCENT) || 10;
 const stableDisplaySteps = Number(process.env.STABLE_DISPLAY_STEPS) || 5;
 const esp32TimeoutMs = Number(process.env.ESP32_TIMEOUT_MS) || 30000;
+const sensorFullDistanceCm = Number(process.env.SENSOR_FULL_DISTANCE_CM) || 230;
+const sensorFullScalePercent = Number(process.env.SENSOR_FULL_SCALE_PERCENT) || 120;
+const sensorUsableDistanceCm = sensorFullDistanceCm / (sensorFullScalePercent / 100);
 
 fs.mkdirSync(path.dirname(databasePath), { recursive: true });
 
@@ -414,7 +420,12 @@ app.get("/api/health", (req, res) => {
     lastEsp32ReadingAt:
       lastEsp32ReadingAt === null ? null : new Date(lastEsp32ReadingAt).toISOString(),
     apiKeyRequired: apiKeyIsRequired,
-    databaseFile
+    databaseFile,
+    calibration: {
+      sensorFullDistanceCm,
+      sensorFullScalePercent,
+      sensorUsableDistanceCm: Math.round(sensorUsableDistanceCm)
+    }
   });
 });
 
@@ -450,8 +461,10 @@ app.post("/api/water-level", (req, res) => {
     });
   }
 
-  const percentage = Number(req.body.percentage);
   const distanceCm = getCleanDistanceCm(req.body.distanceCm);
+  const percentage = distanceCm === null
+    ? Number(req.body.percentage)
+    : calculatePercentageFromDistance(distanceCm);
 
   if (Number.isNaN(percentage) || percentage < 0 || percentage > 100) {
     return res.status(400).json({

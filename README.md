@@ -58,6 +58,8 @@ Copy `.env.example` to `.env` and edit the values:
 PORT=3000
 ESP32_API_KEY=change-this-secret-key
 DATABASE_FILE=data/water-level.db
+SENSOR_FULL_DISTANCE_CM=230
+SENSOR_FULL_SCALE_PERCENT=120
 READINGS_PER_SCAN=15
 SCAN_INTERVAL_MS=2000
 TOLERANCE_PERCENT=10
@@ -68,6 +70,27 @@ ESP32_TIMEOUT_MS=30000
 `.env` is ignored by Git so secret values are not uploaded.
 
 If `ESP32_API_KEY` is empty or missing, the API key check is disabled. For deployment, set a real API key.
+
+## Sensor Calibration
+
+Current measured setup:
+
+- Full distance from sensor to sea floor: `230 cm`
+- Full distance scale: `120%`
+- Usable water level range: `0%` to `100%`
+
+Because `230 cm` represents `120%`, the usable 0% to 100% water height is:
+
+```text
+230 / 1.2 = 191.67 cm
+```
+
+So the dashboard distance estimate is:
+
+- `0%` water level: sensor reads about `230 cm`
+- `100%` water level: sensor reads about `38 cm`
+
+This keeps the sensor away from the water at the 100% level.
 
 ## SQLite Database
 
@@ -134,6 +157,8 @@ Body:
   "distanceCm": 202.3
 }
 ```
+
+If `distanceCm` is included, the backend calculates the percentage using the current sensor calibration. This keeps the web app calculation consistent even if the ESP32 also sends a percentage.
 
 ### Get Recent Raw Readings
 
