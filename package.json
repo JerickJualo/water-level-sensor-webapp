@@ -4,7 +4,7 @@
   "description": "A simple water level monitoring dashboard using Express and mock sensor data.",
   "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --check server.js && node --check public/app.js",
     "start": "node server.js",
     "dev": "nodemon server.js"
   },

@@ -496,17 +496,6 @@ function updateChart(level) {
     historyReadings.length + " recent readings";
 }
 
-function setScenario(scenarioKey) {
-  selectedScenario = scenarioKey;
-  demoTick = 0;
-  demoFilter = createEmptyDemoFilter();
-  const scenario = demoScenarios[scenarioKey];
-  document.getElementById("scenario-name").innerText = scenario.name;
-  historyReadings.splice(0, historyReadings.length, ...createMockHistory(scenario));
-  drawChart(historyReadings);
-  loadData();
-}
-
 function drawChart(readings) {
   const canvas = document.getElementById("history-chart");
   const ctx = canvas.getContext("2d");
@@ -1069,16 +1058,67 @@ async function renderAboutPage() {
   }
 }
 
+async function renderSettingsModal() {
+  try {
+    const [health, calibration] = await Promise.all([
+      fetchJson("/api/health"),
+      fetchJson("/api/calibration")
+    ]);
+
+    document.getElementById("settings-server").innerText =
+      "Online for " + health.uptimeSeconds + " seconds";
+    document.getElementById("settings-source").innerText =
+      formatDataSource(health.dataSource);
+    document.getElementById("settings-esp32").innerText =
+      formatEsp32Status(health.esp32Status);
+    document.getElementById("settings-api-key").innerText =
+      health.apiKeyRequired ? "Enabled" : "Disabled";
+    document.getElementById("settings-database").innerText = health.databaseFile;
+    document.getElementById("settings-scan").innerText =
+      calibration.readingsPerScan +
+      " readings x 2, " +
+      calibration.scanIntervalMs / 1000 +
+      " sec interval";
+    document.getElementById("settings-full-distance").innerText =
+      calibration.sensorFullDistanceCm + " cm at " + calibration.sensorFullScalePercent + "%";
+    document.getElementById("settings-full-level-distance").innerText =
+      calibration.sensorDistanceAtFullPercentCm + " cm";
+  } catch (error) {
+    document.getElementById("settings-server").innerText = "Unable to load";
+    document.getElementById("settings-source").innerText = "--";
+    document.getElementById("settings-esp32").innerText = "--";
+    document.getElementById("settings-api-key").innerText = "--";
+    document.getElementById("settings-database").innerText = "--";
+    document.getElementById("settings-scan").innerText = "--";
+    document.getElementById("settings-full-distance").innerText = "--";
+    document.getElementById("settings-full-level-distance").innerText = "--";
+  }
+}
+
+function openSettingsModal() {
+  document.getElementById("settings-modal").hidden = false;
+  document.getElementById("settings-close").focus();
+  renderSettingsModal();
+}
+
+function closeSettingsModal() {
+  document.getElementById("settings-modal").hidden = true;
+  document.getElementById("settings-button").focus();
+}
+
 function showPage(pageName) {
   const isHistory = pageName === "history";
   const isAbout = pageName === "about";
+  const isDeveloper = pageName === "developer";
 
-  document.getElementById("dashboard-view").classList.toggle("active", !isHistory && !isAbout);
+  document.getElementById("dashboard-view").classList.toggle("active", !isHistory && !isAbout && !isDeveloper);
   document.getElementById("history-view").classList.toggle("active", isHistory);
   document.getElementById("about-view").classList.toggle("active", isAbout);
-  document.getElementById("dashboard-tab").classList.toggle("active", !isHistory && !isAbout);
+  document.getElementById("developer-view").classList.toggle("active", isDeveloper);
+  document.getElementById("dashboard-tab").classList.toggle("active", !isHistory && !isAbout && !isDeveloper);
   document.getElementById("history-tab").classList.toggle("active", isHistory);
   document.getElementById("about-tab").classList.toggle("active", isAbout);
+  document.getElementById("developer-tab").classList.toggle("active", isDeveloper);
 
   if (isHistory) {
     renderHistoryPage();
@@ -1091,12 +1131,23 @@ function showPage(pageName) {
 
 drawChart(historyReadings);
 renderHistoryPage();
-document.getElementById("scenario-select").addEventListener("change", (event) => {
-  setScenario(event.target.value);
-});
 document.getElementById("dashboard-tab").addEventListener("click", () => showPage("dashboard"));
 document.getElementById("history-tab").addEventListener("click", () => showPage("history"));
 document.getElementById("about-tab").addEventListener("click", () => showPage("about"));
+document.getElementById("developer-tab").addEventListener("click", () => showPage("developer"));
+document.getElementById("settings-button").addEventListener("click", openSettingsModal);
+document.getElementById("settings-close").addEventListener("click", closeSettingsModal);
+document.getElementById("settings-refresh").addEventListener("click", renderSettingsModal);
+document.getElementById("settings-modal").addEventListener("click", (event) => {
+  if (event.target.id === "settings-modal") {
+    closeSettingsModal();
+  }
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !document.getElementById("settings-modal").hidden) {
+    closeSettingsModal();
+  }
+});
 document.getElementById("history-range").addEventListener("change", () => {
   renderHistoryPage();
 });

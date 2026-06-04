@@ -24,30 +24,13 @@
             <button id="dashboard-tab" class="page-tab active" type="button">Dashboard</button>
             <button id="history-tab" class="page-tab" type="button">History</button>
             <button id="about-tab" class="page-tab" type="button">About</button>
+            <button id="developer-tab" class="page-tab" type="button">Developer</button>
           </nav>
-          <button class="icon-button" type="button" aria-label="Settings">&#9881;</button>
+          <button id="settings-button" class="icon-button" type="button" aria-label="Settings">&#9881;</button>
         </div>
       </header>
 
       <section id="dashboard-view" class="page-view active">
-        <section class="demo-controls" aria-label="Demo data controls">
-          <div>
-            <p class="section-label">Demo Data</p>
-            <strong id="scenario-name">ESP32-ready API data</strong>
-          </div>
-          <label for="scenario-select">
-            <span>Condition</span>
-            <select id="scenario-select">
-              <option value="api">API mock scan</option>
-              <option value="stable">Stable weather</option>
-              <option value="raining">Raining</option>
-              <option value="storming">Storming</option>
-              <option value="rising">Rising tide</option>
-              <option value="flooding">Flooding risk</option>
-            </select>
-          </label>
-        </section>
-
         <section class="level-overview" aria-label="Current sea water level">
           <div class="gauge-area">
             <div class="gauge-labels" aria-hidden="true">
@@ -379,9 +362,154 @@
             <div><span>5</span><strong>Average accepted readings for the final value.</strong></div>
           </div>
         </section>
+
+      </section>
+
+      <section id="developer-view" class="page-view history-page" aria-label="Project developers">
+        <section class="history-filter">
+          <div>
+            <p class="section-label">Developers</p>
+            <h2>Project Development Team</h2>
+          </div>
+          <span>Surigao Del Norte State University</span>
+        </section>
+
+        <section class="history-panel developer-panel" aria-label="Project developers">
+          <div class="chart-header">
+            <div>
+              <p class="section-label">Computer Engineering Course</p>
+              <h2>Team Members</h2>
+            </div>
+            <span>6 members</span>
+          </div>
+
+          <div class="developer-school">
+            <strong>Computer Engineering Course</strong>
+            <span>Surigao Del Norte State University</span>
+          </div>
+
+          <div class="developer-grid">
+            <article class="developer-card">
+              <div class="developer-photo developer-photo-jerick">
+                <img src="developers/jerick.jpg" alt="Jerick C. Jualo" onerror="this.hidden = true">
+                <span>Photo</span>
+              </div>
+              <div>
+                <h3>Jerick C. Jualo</h3>
+                <p>Web and System Developer</p>
+              </div>
+            </article>
+
+            <article class="developer-card">
+              <div class="developer-photo developer-photo-james">
+                <img src="developers/james carl.jpg" alt="James Carl E. Bituin" onerror="this.hidden = true">
+                <span>Photo</span>
+              </div>
+              <div>
+                <h3>James Carl E. Bituin</h3>
+                <p>Hardware Developer</p>
+              </div>
+            </article>
+
+            <article class="developer-card">
+              <div class="developer-photo developer-photo-april">
+                <img src="developers/april evan jean.jpg" alt="April Evan Jean Y. Elico" onerror="this.hidden = true">
+                <span>Photo</span>
+              </div>
+              <div>
+                <h3>April Evan Jean Y. Elico</h3>
+                <p>Project Administrator</p>
+              </div>
+            </article>
+
+            <article class="developer-card">
+              <div class="developer-photo developer-photo-louie">
+                <img src="developers/louie jay.jpg" alt="Louie Jay H. Larong" onerror="this.hidden = true">
+                <span>Photo</span>
+              </div>
+              <div>
+                <h3>Louie Jay H. Larong</h3>
+                <p>Project Head</p>
+              </div>
+            </article>
+
+            <article class="developer-card">
+              <div class="developer-photo developer-photo-urel">
+                <img src="developers/urel.jpg" alt="Urel E. Chua" onerror="this.hidden = true">
+                <span>Photo</span>
+              </div>
+              <div>
+                <h3>Urel E. Chua</h3>
+                <p>Finance Manager</p>
+              </div>
+            </article>
+
+            <article class="developer-card">
+              <div class="developer-photo" aria-label="Photo placeholder for Mico Ecoben Angob">
+                <span>Photo</span>
+              </div>
+              <div>
+                <h3>Mico Ecoben Angob</h3>
+                <p>Material Handler</p>
+              </div>
+            </article>
+          </div>
+        </section>
       </section>
     </section>
   </main>
+
+  <div id="settings-modal" class="modal-backdrop" hidden>
+    <section class="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <header class="modal-header">
+        <div>
+          <p class="section-label">Settings</p>
+          <h2 id="settings-title">Runtime Configuration</h2>
+        </div>
+        <button id="settings-close" class="icon-button" type="button" aria-label="Close settings">&times;</button>
+      </header>
+
+      <div class="settings-grid" aria-label="Current runtime settings">
+        <div>
+          <span>Server</span>
+          <strong id="settings-server">--</strong>
+        </div>
+        <div>
+          <span>Data Source</span>
+          <strong id="settings-source">--</strong>
+        </div>
+        <div>
+          <span>ESP32</span>
+          <strong id="settings-esp32">--</strong>
+        </div>
+        <div>
+          <span>API Key</span>
+          <strong id="settings-api-key">--</strong>
+        </div>
+        <div>
+          <span>Database</span>
+          <strong id="settings-database">--</strong>
+        </div>
+        <div>
+          <span>Scan Timing</span>
+          <strong id="settings-scan">--</strong>
+        </div>
+        <div>
+          <span>Full Distance</span>
+          <strong id="settings-full-distance">--</strong>
+        </div>
+        <div>
+          <span>100% Distance</span>
+          <strong id="settings-full-level-distance">--</strong>
+        </div>
+      </div>
+
+      <div class="settings-actions">
+        <code>/api/water-level</code>
+        <button id="settings-refresh" class="text-button" type="button">Refresh</button>
+      </div>
+    </section>
+  </div>
 
   <script src="app.js"></script>
 </body>
