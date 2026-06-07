@@ -22,6 +22,7 @@ body {
   font-family: Arial, Helvetica, sans-serif;
   color: var(--text);
   background: var(--bg);
+  overflow-x: hidden;
 }
 
 .app-shell {
@@ -945,14 +946,21 @@ h2 {
 
 @media (max-width: 800px) {
   .app-shell {
-    padding: 16px;
+    display: block;
+    padding: 12px;
+  }
+
+  .dashboard-card {
+    width: 100%;
+    box-shadow: 0 12px 28px rgba(30, 55, 70, 0.1);
   }
 
   .dashboard-header,
   .demo-controls,
   .level-overview,
-  .chart-section {
-    padding: 22px;
+  .chart-section,
+  .history-page {
+    padding: 18px;
   }
 
   .demo-controls {
@@ -1015,8 +1023,16 @@ h2 {
     width: 100%;
   }
 
+  .page-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    border-radius: 8px;
+  }
+
   .page-tab {
-    flex: 1;
+    min-height: 42px;
+    border-radius: 6px;
+    padding: 9px 8px;
   }
 
   .reading-panel {
@@ -1039,33 +1055,201 @@ h2 {
   .gauge-wrap {
     padding-right: 104px;
   }
+
+  .level-number {
+    font-size: clamp(4.2rem, 22vw, 7rem);
+  }
 }
 
 @media (max-width: 520px) {
+  .app-shell {
+    padding: 0;
+  }
+
+  .dashboard-card {
+    min-height: 100vh;
+    border-right: 0;
+    border-left: 0;
+    border-radius: 0;
+  }
+
   .dashboard-header,
   .chart-header {
     align-items: flex-start;
+  }
+
+  .dashboard-header,
+  .level-overview,
+  .chart-section,
+  .history-page {
+    padding: 14px;
   }
 
   .brand {
     align-items: flex-start;
   }
 
+  .brand h1 {
+    font-size: 1.35rem;
+  }
+
+  .brand p,
+  .section-label,
+  .reading-details span,
+  .chart-header span {
+    font-size: 0.82rem;
+  }
+
   .wave-icon {
     width: 46px;
     height: 46px;
+    flex: 0 0 46px;
+  }
+
+  .icon-button {
+    width: 40px;
+    height: 40px;
+  }
+
+  .level-overview {
+    gap: 18px;
   }
 
   .gauge-area {
-    grid-template-columns: 44px 1fr;
+    grid-template-columns: 40px 1fr;
+    gap: 10px;
+    min-height: 280px;
   }
 
   .gauge-wrap {
-    padding-right: 82px;
+    min-height: 280px;
+    padding-right: 80px;
+  }
+
+  .water-gauge {
+    width: min(132px, 100%);
+    height: 280px;
+  }
+
+  .gauge-labels {
+    font-size: 0.78rem;
   }
 
   .zone-label {
-    left: min(150px, 50%);
-    font-size: 0.82rem;
+    left: min(142px, 52%);
+    max-width: 78px;
+    font-size: 0.76rem;
+    line-height: 1.15;
+  }
+
+  .level-number {
+    margin-top: 10px;
+    font-size: clamp(3.6rem, 24vw, 5.4rem);
+  }
+
+  .status-text {
+    margin-top: 12px;
+    padding: 9px 12px;
+    font-size: 0.9rem;
+    text-align: center;
+  }
+
+  .reading-details {
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .reading-details div,
+  .scan-progress,
+  .history-panel,
+  .history-cards div {
+    padding: 12px;
+  }
+
+  .chart-header {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  h2 {
+    font-size: 1.08rem;
+  }
+
+  .chart-wrap,
+  #history-chart,
+  #daily-trend-chart,
+  #monthly-chart {
+    min-height: 240px;
+    height: 240px;
+  }
+
+  .chart-zones span {
+    right: 8px;
+    font-size: 0.68rem;
+  }
+
+  .developer-card {
+    grid-template-columns: 92px minmax(0, 1fr);
+    gap: 12px;
+    min-height: 132px;
+    padding: 12px;
+  }
+
+  .developer-photo {
+    width: 92px;
+    height: 112px;
+  }
+
+  .developer-card h3 {
+    font-size: 1rem;
+  }
+
+  .developer-card p {
+    font-size: 0.9rem;
+  }
+
+  .method-steps div {
+    min-height: auto;
+  }
+
+  th,
+  td {
+    padding: 10px 9px;
+  }
+
+  table {
+    min-width: 760px;
+  }
+
+  .monthly-table {
+    min-width: 680px;
+  }
+
+  .modal-backdrop {
+    padding: 10px;
+  }
+
+  .settings-modal {
+    max-height: calc(100vh - 20px);
+  }
+}
+
+@media (max-width: 380px) {
+  .page-tabs {
+    grid-template-columns: 1fr;
+  }
+
+  .gauge-wrap {
+    padding-right: 68px;
+  }
+
+  .zone-label {
+    left: min(124px, 52%);
+    max-width: 64px;
+    font-size: 0.7rem;
+  }
+
+  .water-gauge {
+    width: min(116px, 100%);
   }
 }
