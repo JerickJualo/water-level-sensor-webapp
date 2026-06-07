@@ -844,6 +844,20 @@ app.post("/api/water-level", asyncHandler(async (req, res) => {
   });
 }));
 
+app.use((req, res, next) => {
+  const isPageRequest =
+    req.method === "GET" &&
+    !req.path.startsWith("/api/") &&
+    path.extname(req.path) === "";
+
+  if (!isPageRequest) {
+    next();
+    return;
+  }
+
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
 app.use((error, req, res, next) => {
   console.error(error);
   res.status(500).json({
