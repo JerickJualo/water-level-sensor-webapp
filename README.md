@@ -66,6 +66,8 @@ Copy `.env.example` to `.env` and edit the values:
 PORT=3000
 ESP32_API_KEY=change-this-secret-key
 DATABASE_FILE=data/water-level.db
+DATABASE_URL=
+DATABASE_SSL=true
 ENABLE_MOCK_DATA=true
 ALLOWED_ORIGINS=
 SENSOR_FULL_DISTANCE_CM=230
@@ -89,6 +91,8 @@ For local testing, `ESP32_API_KEY` may be left empty to disable API key checks. 
 ALLOWED_ORIGINS=https://your-app-name.example.com
 ```
 
+For deployment with an external hosted PostgreSQL database, set `DATABASE_URL` to the connection string from your database provider. When `DATABASE_URL` is set, the app stores readings in PostgreSQL instead of the local SQLite file.
+
 ## Sensor Calibration
 
 Current measured setup:
@@ -110,22 +114,29 @@ So the dashboard distance estimate is:
 
 This keeps the sensor away from the water at the 100% level.
 
-## SQLite Database
+## Database Storage
 
-The app saves readings in a SQLite database file:
+For local development, the app saves readings in a SQLite database file:
 
 ```text
 data/water-level.db
 ```
 
-The database is created automatically when the server starts.
+For deployment, use a hosted PostgreSQL database and set:
+
+```text
+DATABASE_URL=postgresql://...
+DATABASE_SSL=true
+```
+
+The database tables are created automatically when the server starts.
 
 Tables:
 
 - `raw_readings`: saves every raw scan reading from mock mode or ESP32 mode.
 - `stable_readings`: saves only final accepted values after the two-scan filtering cycle finishes.
 
-The database file is ignored by Git because it contains generated runtime data.
+The local SQLite database file is ignored by Git because it contains generated runtime data.
 
 ## API Endpoints
 
@@ -243,14 +254,15 @@ Also set environment variables on the hosting platform, especially:
 NODE_ENV=production
 ESP32_API_KEY
 PORT
-DATABASE_FILE
+DATABASE_URL
+DATABASE_SSL=true
 ENABLE_MOCK_DATA=false
 ALLOWED_ORIGINS=https://your-app-name.example.com
 ```
 
 Use Node.js 24 or newer because the app uses the built-in `node:sqlite` module.
 
-For SQLite storage, deploy to a platform that supports persistent writable storage. If the host has an ephemeral filesystem, saved readings in `data/water-level.db` may disappear after restarts or redeploys. In that case, set `DATABASE_FILE` to a persistent disk path provided by the host.
+For client-facing deployment, use a hosted PostgreSQL database. This avoids losing saved history when a free web service restarts or redeploys. Keep SQLite only for local development or for paid hosts with persistent disk storage.
 
 Keep `ENABLE_MOCK_DATA=false` in production if you only want real ESP32 readings saved to history. This prevents mock readings from filling the database while the ESP32 is offline.
 

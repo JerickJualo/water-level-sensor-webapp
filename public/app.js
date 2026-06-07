@@ -444,6 +444,14 @@ function formatEsp32Status(status) {
   return "Offline";
 }
 
+function formatDatabaseTarget(health) {
+  if (health.databaseProvider === "postgres") {
+    return "PostgreSQL - " + (health.databaseTarget || "DATABASE_URL");
+  }
+
+  return "SQLite - " + (health.databaseTarget || health.databaseFile || "local file");
+}
+
 function formatPhase(phase) {
   if (phase === "baseline") {
     return "Baseline Scan";
@@ -1025,7 +1033,7 @@ async function renderAboutPage() {
       "Server online";
     document.getElementById("about-server-status").innerText =
       "Online for " + health.uptimeSeconds + " seconds";
-    document.getElementById("about-database-file").innerText = health.databaseFile;
+    document.getElementById("about-database-file").innerText = formatDatabaseTarget(health);
     document.getElementById("about-api-key").innerText =
       health.apiKeyRequired ? "Enabled" : "Disabled";
     document.getElementById("about-esp32-status").innerText =
@@ -1066,7 +1074,7 @@ async function renderSettingsModal() {
       formatEsp32Status(health.esp32Status);
     document.getElementById("settings-api-key").innerText =
       health.apiKeyRequired ? "Enabled" : "Disabled";
-    document.getElementById("settings-database").innerText = health.databaseFile;
+    document.getElementById("settings-database").innerText = formatDatabaseTarget(health);
     document.getElementById("settings-scan").innerText =
       calibration.readingsPerScan +
       " readings x 2, " +

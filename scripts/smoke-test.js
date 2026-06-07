@@ -97,6 +97,10 @@ async function main() {
       throw new Error("/api/health should report mockDataEnabled=false");
     }
 
+    if (health.databaseProvider !== "sqlite") {
+      throw new Error("/api/health should report sqlite for the local smoke-test database");
+    }
+
     const allowedCors = await fetch(baseUrl + "/api/health", {
       headers: {
         Origin: "http://example.test"
