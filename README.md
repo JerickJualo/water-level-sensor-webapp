@@ -2,21 +2,21 @@
 
 A school project web app for monitoring sea water level using Node.js, Express, HTML, CSS, and vanilla JavaScript.
 
-The app currently supports mock data and ESP32 sensor data. The ESP32 sends water level readings to the Express API, and the dashboard shows the raw reading, stable final reading, scan progress, alerts, and history mock data.
+The app currently supports mock data and ESP32 sensor data. The ESP32 sends water level readings to the Express API, and the dashboard shows the raw reading, stable final reading, scan progress, alerts, and saved history data.
 
 ## Features
 
 - Express backend
 - Dashboard served from the `public` folder
 - ESP32-ready API endpoint
-- Mock data fallback when ESP32 is offline
+- Optional mock data fallback when ESP32 is offline
 - Two-scan filtering method for wave irregularities
 - Raw reading vs stable final reading display
 - ESP32 online/offline status
 - Health check endpoint for deployment
-- Optional API key protection for ESP32 POST requests
+- API key protection for ESP32 POST requests in production
 - SQLite storage for raw and stable readings
-- Mock History page with daily and monthly summaries
+- History page with daily and monthly summaries from saved stable readings
 
 ## Project Structure
 
@@ -35,7 +35,7 @@ public/
 Install dependencies:
 
 ```powershell
-npm.cmd install
+npm.cmd ci
 ```
 
 Start the app:
@@ -50,6 +50,14 @@ Open the dashboard:
 http://localhost:3000
 ```
 
+Run checks before deploying:
+
+```powershell
+npm.cmd test
+```
+
+This runs syntax checks and an API smoke test for `/api/health`, protected ESP32 POST requests, and history endpoints.
+
 ## Environment Config
 
 Copy `.env.example` to `.env` and edit the values:
@@ -58,6 +66,8 @@ Copy `.env.example` to `.env` and edit the values:
 PORT=3000
 ESP32_API_KEY=change-this-secret-key
 DATABASE_FILE=data/water-level.db
+ENABLE_MOCK_DATA=true
+ALLOWED_ORIGINS=
 SENSOR_FULL_DISTANCE_CM=230
 SENSOR_FULL_SCALE_PERCENT=120
 READINGS_PER_SCAN=15
@@ -69,7 +79,15 @@ ESP32_TIMEOUT_MS=30000
 
 `.env` is ignored by Git so secret values are not uploaded.
 
-If `ESP32_API_KEY` is empty or missing, the API key check is disabled. For deployment, set a real API key.
+For local testing, `ESP32_API_KEY` may be left empty to disable API key checks. In production (`NODE_ENV=production`), the API key is required, so set a real `ESP32_API_KEY` on the hosting platform and use the same value in the ESP32 device code.
+
+`ENABLE_MOCK_DATA=true` keeps simulated readings running when the ESP32 is offline. In production, mock data is disabled by default unless this variable is explicitly set to `true`.
+
+`ALLOWED_ORIGINS` controls browser CORS in production. Leave it empty for same-origin use only, or set comma-separated deployed frontend origins, for example:
+
+```text
+ALLOWED_ORIGINS=https://your-app-name.example.com
+```
 
 ## Sensor Calibration
 
@@ -126,7 +144,8 @@ Example response:
   "dataSource": "esp32",
   "esp32Status": "online",
   "lastEsp32ReadingAt": "2026-05-25T07:30:00.000Z",
-  "apiKeyRequired": true
+  "apiKeyRequired": true,
+  "mockDataEnabled": false
 }
 ```
 
@@ -206,10 +225,9 @@ The raw reading can update every ESP32 send, but the Current Level updates only 
 
 ## Alert Thresholds
 
-- 0% to 49%: Low Sea Level
-- 50% to 79%: High Sea Level
-- 80% to 89%: Very High Sea Level
-- 90% to 100%: Flooding Level
+- 0% to 79%: Normal
+- 80% to 89%: Warning
+- 90% to 100%: Critical
 
 ## Deployment Notes
 
@@ -222,13 +240,25 @@ const char* serverUrl = "https://your-app-name.example.com/api/water-level";
 Also set environment variables on the hosting platform, especially:
 
 ```text
+NODE_ENV=production
 ESP32_API_KEY
 PORT
+DATABASE_FILE
+ENABLE_MOCK_DATA=false
+ALLOWED_ORIGINS=https://your-app-name.example.com
 ```
+
+Use Node.js 24 or newer because the app uses the built-in `node:sqlite` module.
+
+For SQLite storage, deploy to a platform that supports persistent writable storage. If the host has an ephemeral filesystem, saved readings in `data/water-level.db` may disappear after restarts or redeploys. In that case, set `DATABASE_FILE` to a persistent disk path provided by the host.
+
+Keep `ENABLE_MOCK_DATA=false` in production if you only want real ESP32 readings saved to history. This prevents mock readings from filling the database while the ESP32 is offline.
+
+In production, CORS is restricted. If the frontend and API are served from the same deployed app, `ALLOWED_ORIGINS` can be empty. If a separate frontend domain calls the API, add that exact `https://` origin to `ALLOWED_ORIGINS`.
 
 ## Future Improvements
 
-- Save alert logs for Very High and Flooding events
+- Save alert logs for Warning and Critical events
 - Add CSV export
 - Add calibration settings page
 - Let the backend calculate percentage from distance only

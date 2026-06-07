@@ -716,6 +716,10 @@ h1 {
   object-position: 50% 32%;
 }
 
+.developer-photo-mico img {
+  object-position: 50% 20%;
+}
+
 .developer-card h3 {
   margin: 0;
   font-size: 1.22rem;

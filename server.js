@@ -37,33 +37,59 @@ function loadEnvFile() {
 
 loadEnvFile();
 
+function getBooleanEnv(name, defaultValue) {
+  const value = process.env[name];
+
+  if (value === undefined) {
+    return defaultValue;
+  }
+
+  return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
+}
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 const esp32ApiKey = process.env.ESP32_API_KEY || "";
-const apiKeyIsRequired = esp32ApiKey !== "";
+const appIsProduction = process.env.NODE_ENV === "production";
+const apiKeyIsRequired = esp32ApiKey !== "" || appIsProduction;
+const mockDataEnabled = getBooleanEnv("ENABLE_MOCK_DATA", !appIsProduction);
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter((origin) => origin !== "");
 const databaseFile = process.env.DATABASE_FILE || "data/water-level.db";
 const databasePath = path.isAbsolute(databaseFile)
   ? databaseFile
   : path.join(__dirname, databaseFile);
 
-app.use(cors());
+if (!appIsProduction) {
+  app.use(cors());
+} else if (allowedOrigins.length > 0) {
+  app.use(cors({
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(null, false);
+    }
+  }));
+}
+
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
 function getWaterStatus(percentage) {
   if (percentage >= 90) {
-    return "Flooding Level";
+    return "Critical";
   }
 
   if (percentage >= 80) {
-    return "Very High Sea Level";
+    return "Warning";
   }
 
-  if (percentage >= 50) {
-    return "High Sea Level";
-  }
-
-  return "Low Sea Level";
+  return "Normal";
 }
 
 function getStatusKey(percentage) {
@@ -589,8 +615,10 @@ function runMockScanStep() {
   processWaterReading(createMockSensorReading(), null);
 }
 
-runMockScanStep();
-setInterval(runMockScanStep, scanIntervalMs);
+if (mockDataEnabled) {
+  runMockScanStep();
+  setInterval(runMockScanStep, scanIntervalMs);
+}
 
 app.get("/api/water-level", (req, res) => {
   waterData.esp32Status = getEsp32Status();
@@ -606,6 +634,8 @@ app.get("/api/health", (req, res) => {
     lastEsp32ReadingAt:
       lastEsp32ReadingAt === null ? null : new Date(lastEsp32ReadingAt).toISOString(),
     apiKeyRequired: apiKeyIsRequired,
+    mockDataEnabled,
+    corsAllowedOrigins: appIsProduction ? allowedOrigins : ["*"],
     databaseFile,
     calibration: {
       sensorFullDistanceCm,

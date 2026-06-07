@@ -258,28 +258,21 @@ function getSeaLevelStatus(level) {
 
   if (level >= 90) {
     return {
-      text: "Flooding Level",
+      text: "Critical",
       className: "status-flooding"
     };
   }
 
   if (level >= 80) {
     return {
-      text: "Very High Sea Level",
+      text: "Warning",
       className: "status-very-high"
     };
   }
 
-  if (level >= 50) {
-    return {
-      text: "High Sea Level",
-      className: "status-high"
-    };
-  }
-
   return {
-    text: "Low Sea Level",
-    className: "status-low"
+    text: "Normal",
+    className: level >= 50 ? "status-high" : "status-low"
   };
 }
 
@@ -301,10 +294,10 @@ function getStatusKey(level) {
 
 function getStatusLabel(key) {
   const labels = {
-    low: "Low Sea Level",
-    high: "High Sea Level",
-    veryHigh: "Very High Sea Level",
-    flooding: "Flooding Level"
+    low: "Normal",
+    high: "Normal",
+    veryHigh: "Warning",
+    flooding: "Critical"
   };
 
   return labels[key];
